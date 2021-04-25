@@ -7,16 +7,40 @@ class Progress {
     get text() {
         return this.ele.innerText;
     }
+    /**@param {any} v*/
     set text(v) {
         if (typeof v == "string") this.ele.innerText = v;
         else if (v == null) this.ele.innerText = "";
+        else if (v.constructor == Error) {
+            if (v.stack != null) this.ele.innerText = v.stack;
+            else this.ele.innerText = v.name + ": " + v.message;
+        }
+        else {
+            let s = "";
+            try {
+                s = "" + v;
+            } catch (e) { }
+            this.ele.innerText = s;
+        }
     }
     get HTML() {
         return this.ele.innerHTML;
     }
+    /**@param {any} v*/
     set HTML(v) {
         if (typeof v == "string") this.ele.innerHTML = v;
         else if (v == null) this.ele.innerHTML = "";
+        else if (v.constructor == Error) {
+            if (v.stack != null) this.ele.innerText = v.stack;
+            else this.ele.innerText = v.name + ": " + v.message;
+        }
+        else {
+            let s = "";
+            try {
+                s = "" + v;
+            } catch (e) { }
+            this.ele.innerHTML = s;
+        }
     }
 }
 

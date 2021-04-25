@@ -39,14 +39,19 @@ class EPUB {
  */
 async function haveMimeType(zip, p) {
     n = "mimetype";
-    if (!zip.files.hasOwnProperty(n)) return false;
+    if (!zip.files.hasOwnProperty(n)) {
+        p.text = "Can not find mimetype file."
+        return false;
+    }
     p.text = "Check mimetype file."
     try {
-        let s = await zip.files.mimetype.async("string", (m) => {JSZipProgessFun(m, p, n);});
+        let s = await zip.files.mimetype.async("string", (m) => { JSZipProgessFun(m, p, n); });
         if (s == "application/epub+zip") return true;
+        p.text = 'The content of mimetype must be "application/epub+zip".'
         return false;
     } catch (e) {
         console.warn(e);
+        p.text = e;
         return false;
     }
 }
@@ -61,11 +66,10 @@ async function checkContainer(zip, epub, p) {
     p.text = "Check container.xml file."
     if (!zip.files.hasOwnProperty(n)) return false;
     try {
-        let s = await zip.files[n].async("string", (m) => {JSZipProgessFun(m, p, n)});
+        let s = await zip.files[n].async("string", (m) => { JSZipProgessFun(m, p, n) });
         let pa = new DOMParser();
         let d = pa.parseFromString(s, "application/xml");
         let root = d.children[0];
-        debugger;
         let l = root.getElementsByTagName('rootfiles');
         if (l.length != 1) return false;
         let rootfiles = l[0];
@@ -86,6 +90,7 @@ async function checkContainer(zip, epub, p) {
         return true;
     }
     catch (e) {
+        console.warn(e);
         return false;
     }
 }
@@ -93,13 +98,36 @@ async function checkContainer(zip, epub, p) {
 /**
  * @param {JSZip} zip
  * @param {EPUB} epub
+ * @param {Progress} p
  */
-async function checkOPF(zip, epub) {
+async function checkOPF(zip, epub, p) {
     let l = epub.rootfilelist;
-    if (l == null) return false;
-    for (let i = 0; i < l.length; i++) {
-        let n = l[i];
-        let blob = await zip.files[n].async("blob");
+    if (l == null) {
+        p.text = "Can not find package file."
+        return false;
+    }
+    try {
+        for (let i = 0; i < l.length; i++) {
+            let n = l[i];
+            let s = await zip.files[n].async("string", (m) => { JSZipProgessFun(m, p, n) });
+            let pa = new DOMParser();
+            let d = pa.parseFromString(s, "application/xml");
+            let root = d.children[0];
+            debugger;
+            if (root.localName != "package") return false;
+            let version = root.getAttribute("version");
+            if (version == null) {
+                p.text = "Version is needed in package."
+                return false;
+            }
+            if (version != "3.0") {
+                p.text = "Now only support EPUB 3.0."
+                return false;
+            }
+        }
+    } catch (e) {
+        console.warn(e);
+        return false;
     }
 }
 
@@ -113,6 +141,8 @@ async function isVaildEPUB(zip, epub, p) {
     console.log(hasMimetype);
     if (!hasMimetype) return false;
     let ok = await checkContainer(zip, epub, p);
+    if (!ok) return false;
+    ok = await checkOPF(zip, epub, p);
     if (!ok) return false;
     return true;
 }
