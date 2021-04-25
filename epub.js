@@ -1,6 +1,86 @@
 const JSZip = require("jszip");
 const { Progress, JSZipProgessFun } = require("./log");
 
+class EPUBManifest {
+    constructor(uniqueIdentifier, version, s, d) {
+        if (uniqueIdentifier == undefined || version == undefined) {
+            throw Error("unique-identifier or version is needed in manifest file.");
+        }
+        if (typeof uniqueIdentifier != "string") {
+            throw Error("unique-identifier must be string.")
+        }
+        if (version != "2.0" && version != "3.0") {
+            throw Error("version must be 2.0 or 3.0.")
+        }
+        if (typeof s != "string" || !s.length) {
+            throw Error('s must have content.')
+        }
+        if (d.constructor != Document && d.constructor != XMLDocument) {
+            throw Error("")
+        }
+        this.data = {}
+        this.data["unique-identifier"] = uniqueIdentifier;
+        this.data["version"] = version;
+        this.data["s"] = s;
+        this.data["doc"] = d;
+    }
+    /**@returns {Document}*/
+    get doc() {
+        return this.data["doc"];
+    }
+    get manifest() {
+        /**@type {Array<Element>}*/
+        let l = [];
+        let r = this.root;
+        for (let i = 0; i < r.childElementCount; i++) {
+            let e = r.children[i];
+            if (e.localName == "manifest") {
+                l.push(e);
+            }
+        }
+        return l.length == 1 ? l[0] : null;
+    }
+    get metadata() {
+        /**@type {Array<Element>}*/
+        let l = [];
+        let r = this.root;
+        for (let i = 0; i < r.childElementCount; i++) {
+            let e = r.children[i];
+            if (e.localName == "metadata") {
+                l.push(e);
+            }
+        }
+        return l.length == 1 ? l[0] : null;
+    }
+    /**@returns {string}*/
+    get origin() {
+        return this.data["s"];
+    }
+    get root() {
+        return this.doc.children[0];
+    }
+    get spine() {
+        /**@type {Array<Element>}*/
+        let l = [];
+        let r = this.root;
+        for (let i = 0; i < r.childElementCount; i++) {
+            let e = r.children[i];
+            if (e.localName == "spine") {
+                l.push(e);
+            }
+        }
+        return l.length == 1 ? l[0] : null;
+    }
+    /**@returns {string}*/
+    get uniqueIdentifier() {
+        return this.data["unique-identifier"]
+    }
+    /**@returns {"2.0"|"3.0"} */
+    get version() {
+        return this.data["version"];
+    }
+}
+
 class EPUB {
     constructor(data) {
         this.data = {}
@@ -120,11 +200,30 @@ async function checkOPF(zip, epub, p) {
                 p.text = "Version is needed in package."
                 return false;
             }
-            if (version != "3.0") {
-                p.text = "Now only support EPUB 3.0."
+            if (version != "3.0" && version != "2.0") {
+                p.text = "Now only support EPUB 2.0/3.0."
+                return false;
+            }
+            let uniqueIdentifier = root.getAttribute("unique-identifier");
+            if (uniqueIdentifier == null || !uniqueIdentifier.length) {
+                p.text = "unique-identifier is needed in package."
+                return false;
+            }
+            let m = new EPUBManifest(uniqueIdentifier, version, s, d);
+            if (m.metadata == null) {
+                p.text = "1 metadata is needed in package."
+                return false;
+            }
+            if (m.manifest == null) {
+                p.text = "1 manifest is needed in package."
+                return false;
+            }
+            if (m.spine == null) {
+                p.text = "1 spine is needed in package."
                 return false;
             }
         }
+        return true;
     } catch (e) {
         console.warn(e);
         return false;
